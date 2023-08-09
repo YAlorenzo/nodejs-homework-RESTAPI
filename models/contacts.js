@@ -2,7 +2,7 @@ const Contact = require('../service/schemas/contacts');
 
 const listContacts = async (req, res) => {
  try {
-   const contacts = await Contact.find();
+   const contacts = await Contact.find({ owner: req.user._id });
     res.json(contacts); 
  } catch (error) {
    console.error(error.message);
@@ -13,7 +13,9 @@ const listContacts = async (req, res) => {
 const getContactById = async (req, res) => {
   try {
     const { contactId } = req.params;
-    const foundContact =  await Contact.findOne({ _id: contactId});
+    const foundContact = await Contact.findOne({
+      _id: contactId,
+    });
 
     if (foundContact) {
       res.send(foundContact);
@@ -30,7 +32,7 @@ const getContactById = async (req, res) => {
 const addContact = async (req, res) => {
  try {
    const contact = req.body;
-   await Contact.create({ ...contact });
+   await Contact.create({ ...contact, owner: req.user._id });
    res.status(201).json(`contact with name:${contact.name} add to data base!`);
  } catch (error) {
    console.error(error.message);
@@ -43,7 +45,7 @@ const removeContact = async (req, res) => {
   const { contactId } = req.params;
 
   if (contacts.some((contact) => contact.id === contactId)) {
-    await Contact.findByIdAndRemove({ _id: contactId });
+    await Contact.findByIdAndRemove({ _id: contactId, owner: req.user._id });
     res.status(200).send({message: "contact deleted"});
   }
   else {
@@ -58,8 +60,8 @@ const updateContact = async (req, res) => {
   if (contact.name && contact.phone && contact.email) {
     try {
       const updatedContact = await Contact.findByIdAndUpdate(
-        contactId,
-        { $set: contact }, 
+        { _id: contactId, owner: req.user._id },
+        { $set: contact },
         { new: true }
       );
       res.send(updatedContact);
@@ -82,7 +84,7 @@ const updateStatusContact = async (req, res) => {
   }
   try {
     const updatedContact = await Contact.findByIdAndUpdate(
-      contactId,
+      { _id: contactId, owner: req.user._id },
       { $set: contact, favorite },
       { new: true }
     );
