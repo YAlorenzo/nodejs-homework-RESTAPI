@@ -1,7 +1,12 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const User = require("../service/schemas/users");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs/promises");
 const Joi = require("joi");
+const jimp = require("jimp");
+const gravatar = require("gravatar");
 require("dotenv").config();
 const secret = process.env.SECRET;
 
@@ -25,15 +30,18 @@ const createUser = async (req, res) => {
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+    const avatarURL = gravatar.url(email, { s: "250", d: "retro" });
 
     const newUser = await User.create({
       email,
       password: hashedPassword,
+      avatarURL,
     });
     res.status(201).json({
       user: {
         email: newUser.email,
         subscription: newUser.subscription,
+        avatarURL: newUser.avatarURL,
       },
     });
   } catch (error) {
@@ -140,10 +148,46 @@ const currentUser = async (req, res) => {
   }
 };
 
+const storage = multer.diskStorage({
+  destination: "tmp",
+  filename: (req, file, cb) => {
+    const ext = path.parse(file.originalname).ext;
+    cb(null, Date.now() + ext);
+  },
+});
+
+const upload = multer({ storage });
+
+const avatarUser = async (req, res, next) => {
+  try {
+    const tempFilePath = req.file.path;
+    const image = await jimp.read(tempFilePath);
+    await image.cover(250, 250).writeAsync(tempFilePath);
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      await fs.unlink(tempFilePath);
+      return res.status(401).json({ message: "Not authorized" });
+    }
+    const fileExtension = path.extname(req.file.originalname);
+    const uniqueFileName = `${user._id.toString()}${fileExtension}`;
+    const newAvatarPath = path.join("public", "avatars", uniqueFileName);
+    await fs.rename(tempFilePath, newAvatarPath);
+    user.avatarURL = `avatars/${uniqueFileName}`;
+    await user.save();
+
+    res.json({ avatarURL: user.avatarURL });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
   verifyToken,
   logoutUser,
-  currentUser
+  currentUser,
+  avatarUser,
+  upload
 };

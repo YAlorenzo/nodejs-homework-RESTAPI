@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const Schema = mongoose.Schema;
 
 const userSchema = new Schema({
@@ -11,6 +12,7 @@ const userSchema = new Schema({
     required: [true, "Email is required"],
     unique: true,
   },
+  avatarURL: String,
   subscription: {
     type: String,
     enum: ["starter", "pro", "business"],

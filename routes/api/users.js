@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { createUser, loginUser, verifyToken, logoutUser, currentUser } = require("../../models/users");
+const { createUser, loginUser, verifyToken, logoutUser, currentUser, avatarUser, upload } = require("../../models/users");
+
+
 
 router.post("/register", createUser);
 
@@ -13,6 +15,8 @@ router.get("/protected", verifyToken, (req, res) => {
 router.post("/logout", verifyToken, logoutUser);
 
 router.get("/current", verifyToken, currentUser);
+
+router.patch("/avatars", verifyToken, upload.single("avatar"), avatarUser);
 
 
 
