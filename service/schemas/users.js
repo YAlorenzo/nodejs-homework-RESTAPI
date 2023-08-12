@@ -18,7 +18,23 @@ const userSchema = new Schema({
     enum: ["starter", "pro", "business"],
     default: "starter",
   },
+  verify: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String, 
+    default: null,
+    required: [true, "Verify token is required"],
+  },
   token: String,
+});
+
+userSchema.pre("save", function (next) {
+  if (this.isModified("verify") && this.verify === true) {
+    this.verificationToken = null;
+  }
+  next();
 });
 
 const User = mongoose.model("User", userSchema);

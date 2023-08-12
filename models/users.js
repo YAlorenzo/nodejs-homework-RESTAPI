@@ -7,6 +7,8 @@ const fs = require("fs/promises");
 const Joi = require("joi");
 const jimp = require("jimp");
 const gravatar = require("gravatar");
+const uuid = require("uuid"); 
+const { transporter } = require("../mail/nodemailer");
 require("dotenv").config();
 const secret = process.env.SECRET;
 
@@ -36,12 +38,29 @@ const createUser = async (req, res) => {
       email,
       password: hashedPassword,
       avatarURL,
+      verificationToken: uuid.v4(),
+    });
+    const verificationLink = `http://localhost:3000/users/verify/${newUser.verificationToken}`;
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: newUser.email,
+      subject: "Email Verification",
+      text: `Please click the following link to verify your email: ${verificationLink}`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error(error);
+      } else {
+        console.log("Email sent: " + info.response);
+      }
     });
     res.status(201).json({
       user: {
         email: newUser.email,
         subscription: newUser.subscription,
         avatarURL: newUser.avatarURL,
+        verificationToken: newUser.verificationToken
       },
     });
   } catch (error) {
@@ -52,7 +71,7 @@ const createUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, verify} = req.body;
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -63,6 +82,9 @@ const loginUser = async (req, res) => {
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
       return res.status(401).json({ message: "Email or password is wrong" });
+    }
+    if (!verify) {
+      return res.status(401).json({ message: "Email is not verified" });
     }
 
    
@@ -182,6 +204,78 @@ const avatarUser = async (req, res, next) => {
   }
 };
 
+const verifyEmailUser = async (req, res) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+    if (user) {
+      user.verify = true;
+      await user.save();
+      return res.status(200).json({ message: "Verification successful" });
+    }
+
+    
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "server error" });
+  }
+}
+
+const sendVerifyEmailUser = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "missing required field email" });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    const verificationLink = `http://localhost:3000/users/verify/${user.verificationToken}`;
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: user.email,
+      subject: "Email Verification",
+      text: `Please click the following link to verify your email: ${verificationLink}`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error(error);
+        return res
+          .status(500)
+          .json({ message: "Failed to send verification email" });
+      } else {
+        console.log("Email sent: " + info.response);
+        return res.status(200).json({ message: "Verification email sent" });
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 module.exports = {
   createUser,
   loginUser,
@@ -189,5 +283,7 @@ module.exports = {
   logoutUser,
   currentUser,
   avatarUser,
-  upload
+  upload,
+  verifyEmailUser,
+  sendVerifyEmailUser
 };

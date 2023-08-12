@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { createUser, loginUser, verifyToken, logoutUser, currentUser, avatarUser, upload } = require("../../models/users");
+const { createUser, loginUser, verifyToken, logoutUser, currentUser, avatarUser, upload, verifyEmailUser, sendVerifyEmailUser } = require("../../models/users");
 
 
 
@@ -17,6 +17,11 @@ router.post("/logout", verifyToken, logoutUser);
 router.get("/current", verifyToken, currentUser);
 
 router.patch("/avatars", verifyToken, upload.single("avatar"), avatarUser);
+
+router.get("/verify/:verificationToken", verifyEmailUser);
+
+router.post("/verify" ,sendVerifyEmailUser)
+
 
 
 
